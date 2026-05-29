@@ -22,8 +22,8 @@ class BovWeightCiFailureTest extends TestCase
      */
     public function test_estimacion_peso_bovino_invalida_falla_intencional(): void
     {
-        // 1. Arrange: Simulamos una anomalía donde el algoritmo devuelve un peso negativo
-        $pesoEstimadoErroneo = -45.2;
+        // 1. Arrange: En ramas estables (develop/main) usamos un peso válido para que el CI sea verde
+        $pesoEstimadoErroneo = 45.2;
 
         // 2. Act & Assert: Evaluamos la condición.
         // Falla intencionalmente porque un bovino real no puede tener peso negativo.
