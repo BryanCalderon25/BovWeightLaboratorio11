@@ -1,0 +1,124 @@
+# -----------------------------------------------------------------------------
+# Pipeline de Integración Continua (CI) - BovWeight CR (Backend API)
+# Universidad de Costa Rica | Ingeniería del Software I
+# -----------------------------------------------------------------------------
+
+name: Integración Continua - Backend Laravel (BovWeight CR)
+
+# Triggers: El pipeline se activa ante pushes en main/develop y pull requests hacia main.
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci.yml'
+  workflow_dispatch: # Permite la ejecución manual desde la interfaz de GitHub
+
+jobs:
+  pruebas-backend:
+    name: Pruebas y Validación de Código
+    runs-on: ubuntu-latest
+
+    # Servicio MySQL temporal para pruebas de base de datos relacionales
+    services:
+      mysql-temporal:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+          MYSQL_DATABASE: bovweight_testing
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+    # Definimos el directorio de trabajo predeterminado para todos los comandos run
+    defaults:
+      run:
+        working-directory: backend
+
+    # Variables de entorno globales del Job para las pruebas de Laravel
+    env:
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: bovweight_testing
+      DB_USERNAME: root
+      DB_PASSWORD: ""
+      APP_ENV: testing
+
+    steps:
+      # 1. Obtener el código fuente de la rama activa
+      - name: 📥 Clonar Repositorio
+        uses: actions/checkout@v4
+
+      # 2. Detener servicios preinstalados para evitar colisiones en el puerto 3306
+      - name: 🛑 Detener Servicio MySQL preinstalado en el Runner
+        run: |
+          sudo systemctl stop mysql || true
+          sudo service mysql stop || true
+
+      # 3. Configurar el entorno de ejecución de PHP con extensiones requeridas
+      - name: 🛠️ Configurar PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, pdo_mysql, bcmath, soap, intl, gd, exif, iconv
+          coverage: none
+          tools: composer:v2
+
+      # 4. Obtener el directorio de caché de Composer para acelerar builds posteriores
+      - name: 🔍 Obtener Directorio de Caché de Composer
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      # 5. Cargar o almacenar en caché las dependencias de Composer
+      - name: 💾 Configurar Caché de dependencias
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      # 6. Instalar dependencias del Backend Laravel
+      - name: 📦 Instalar Dependencias de Composer
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      # 7. Crear archivo de variables de entorno para pruebas (.env.testing)
+      - name: ⚙️ Configurar Entorno Laravel (.env.testing)
+        run: |
+          cp .env.example .env.testing
+          # Reemplazar dinámicamente las variables de conexión a base de datos para pruebas
+          sed -i 's/DB_CONNECTION=.*/DB_CONNECTION=mysql/g' .env.testing
+          sed -i 's/DB_HOST=.*/DB_HOST=127.0.0.1/g' .env.testing
+          sed -i 's/DB_PORT=.*/DB_PORT=3306/g' .env.testing
+          sed -i 's/DB_DATABASE=.*/DB_DATABASE=bovweight_testing/g' .env.testing
+          sed -i 's/DB_USERNAME=.*/DB_USERNAME=root/g' .env.testing
+          sed -i 's/DB_PASSWORD=.*/DB_PASSWORD=/g' .env.testing
+
+      # 8. Generar clave criptográfica única de la aplicación
+      - name: 🔑 Generar Clave de Aplicación (APP_KEY)
+        run: php artisan key:generate --env=testing
+
+      # 9. Asignar permisos correctos a directorios de escritura de Laravel
+      - name: 🔒 Configurar Permisos de Archivos
+        run: chmod -R 777 storage bootstrap/cache
+
+      # 10. Ejecutar las migraciones de base de datos sobre MySQL temporal
+      - name: 🗄️ Ejecutar Migraciones de Base de Datos
+        run: php artisan migrate --env=testing --force
+
+      # 11. Ejecutar la suite de pruebas unitarias y de feature mediante PHPUnit
+      - name: 🧪 Ejecutar Pruebas Automatizadas (PHPUnit)
+        run: php artisan test
