@@ -1,0 +1,41 @@
+# =============================================================================
+# .gitignore raíz - BovWeight CR (Laboratorio 11 - DevOps CI/CD)
+# Este repositorio es EXCLUSIVAMENTE para el pipeline de CI/CD del backend.
+# Se excluyen todos los demás componentes del monorepo original.
+# =============================================================================
+
+# Excluir la aplicación móvil (Ionic/Vue 3)
+mobile-app/
+
+# Excluir el microservicio de Machine Learning (Python/Flask)
+ml-service/
+
+# Excluir configuración de Nginx
+nginx/
+
+# Excluir scripts de automatización de subida local
+subir_a_github.bat
+subir_a_github.ps1
+probar_bloqueo_pr.bat
+probar_bloqueo_pr.ps1
+
+# Excluir archivos de configuración de Docker del monorepo
+docker-compose.yml
+iniciar_proyecto.bat
+download_yolo.js
+
+# Excluir archivos de datos JSON pesados del proyecto original
+*.json
+!backend/composer.json
+!backend/package.json
+!.github/**/*.json
+
+# Excluir archivos del sistema operativo
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Excluir directorios de IDE locales
+.vscode/
+.idea/
+.cursor/
